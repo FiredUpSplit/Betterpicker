@@ -930,7 +930,7 @@ function updateManualCount() {
   if (note) note.textContent = names.length > 0 ? `${names.length} unique username${names.length !== 1 ? 's' : ''} ready` : '';
 }
 
-
+async function startManual() {
   const raw = document.getElementById('manual-usernames').value;
   const usernames = parseManualUsernames(raw);
   if (usernames.length === 0) { alert('Paste at least one username to continue.'); return; }
