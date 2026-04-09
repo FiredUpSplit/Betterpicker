@@ -429,98 +429,105 @@ function renderKeyPool() {
     const badgeCls = k.status === 'active' ? 'ks-active' : k.status === 'ok' ? 'ks-ok' : k.status === 'limited' ? 'ks-limited' : k.status === 'error' ? 'ks-error' : 'ks-idle';
     const badgeTxt = k.status === 'active' ? 'in use' : k.status === 'ok' ? 'ready' : k.status === 'limited' ? 'rate limited' : k.status === 'error' ? 'invalid' : 'idle';
     const sub = k.requests > 0 ? `${k.requests} req${k.requests > 1 ? 's' : ''}${k.errors > 0 ? ` · ${k.errors} err` : ''}` : maskToken(k.token);
-    return `<div class="key-row"><div class="key-dot ${dotCls}"></div><div><div class="key-label-text">${k.label}</div><div class="key-label-sub">${sub}</div></div><span class="key-status-badge ${badgeCls}">${badgeTxt}</span><button class="btn-primary btn-sm btn-secondary" onclick="removeKey(${k.id})" style="padding:3px 8px;font-size:11px">Remove</button></div>`;
+    const hint = k.lastError ? `<div class="key-label-sub" style="color:var(--text-warning);white-space:normal">${k.lastError}</div>` : '';
+    return `<div class="key-row"><div class="key-dot ${dotCls}"></div><div style="min-width:0"><div class="key-label-text">${k.label}</div><div class="key-label-sub">${sub}</div>${hint}</div><span class="key-status-badge ${badgeCls}">${badgeTxt}</span><button class="btn-primary btn-sm btn-secondary" onclick="removeKey(${k.id})" style="padding:3px 8px;font-size:11px">Remove</button></div>`;
   }).join('');
   const ready = keyPool.filter(k => k.status !== 'error').length;
   const limited = keyPool.filter(k => k.status === 'limited').length;
   summary.innerHTML = `<span>${keyPool.length}</span> key${keyPool.length > 1 ? 's' : ''} — <span>${ready}</span> usable${limited > 0 ? ` · <span style="color:var(--text-warning)">${limited} rate limited</span>` : ''}`;
 }
 
-/* Ordered list of CORS proxies to try. If one strips the Authorization header
-   (causing a spurious 401) we fall through to the next automatically.        */
-const PROXIES = [
-  'https://corsproxy.io/?',
-  'https://api.allorigins.win/raw?url=',
-  'https://thingproxy.freeboard.io/fetch/',
-];
-let activeProxyIndex = 0;
-
-function getProxy() { return PROXIES[activeProxyIndex]; }
-
-/* Lightweight endpoint that works on ALL X API tiers (including free).
-   Fetches the public @XDevelopers user — no search permission needed.  */
-const VERIFY_PATH = 'users/by/username/XDevelopers?user.fields=id';
+const PROXY = 'https://corsproxy.io/?';
+/* Twitter's own error JSON always has a `type` URL pointing to twitter.com.
+   A proxy's own error will NOT have this field — the only reliable tell.   */
+function isRealTwitter401(body) {
+  return typeof body?.type === 'string' && body.type.includes('twitter.com');
+}
 
 async function verifyAllKeys() {
   if (keyPool.length === 0) { alert('Add at least one key first.'); return; }
+  const errEl = document.getElementById('key-error');
+  errEl.classList.add('hidden');
+
   for (const k of keyPool) {
-    k.status = 'active'; renderKeyPool();
-    let verified = false;
-    for (let pi = 0; pi < PROXIES.length; pi++) {
-      try {
-        const proxy = PROXIES[pi];
-        const r = await fetch(proxy + encodeURIComponent('https://api.twitter.com/2/' + VERIFY_PATH), {
-          headers: { Authorization: 'Bearer ' + k.token }
-        });
-        if (r.status === 200) {
-          k.status = 'ok';
-          if (pi !== activeProxyIndex) { activeProxyIndex = pi; }  // switch global proxy to the working one
-          verified = true; break;
-        } else if (r.status === 429) {
-          k.status = 'limited'; k.limitedUntil = Date.now() + 15 * 60 * 1000;
-          verified = true; break;
-        } else if (r.status === 401) {
-          /* Could be a stripped header — try next proxy before giving up */
-          continue;
-        } else if (r.status === 403) {
-          /* Definitive auth rejection from Twitter itself */
-          k.status = 'error'; verified = true; break;
+    k.status = 'active'; k.lastError = null; renderKeyPool();
+    try {
+      const url = PROXY + encodeURIComponent('https://api.twitter.com/2/users/by/username/twitter?user.fields=id');
+      const r = await fetch(url, { headers: { Authorization: 'Bearer ' + k.token.trim() } });
+      let body = {};
+      try { body = await r.json(); } catch(_) {}
+
+      if (r.status === 200) {
+        k.status = 'ok';
+      } else if (r.status === 403) {
+        k.status = 'ok';
+        k.lastError = 'Token valid — 403 means tier-restricted, not an auth failure.';
+      } else if (r.status === 429) {
+        k.status = 'limited'; k.limitedUntil = Date.now() + 15 * 60 * 1000;
+      } else if (r.status === 401) {
+        if (isRealTwitter401(body)) {
+          k.status = 'error';
+          k.lastError = `Rejected by X: ${body.detail || body.title || 'invalid token'}. Copy the full Bearer token from developer.x.com (starts with AAAA).`;
+        } else {
+          /* No twitter.com type field = CORS proxy stripped the auth header.
+             The token itself is unknown — don't call it invalid.            */
+          k.status = 'idle';
+          k.lastError = 'Verification blocked — the CORS proxy stripped the auth header. Click Fetch to do a live test instead.';
         }
-      } catch(e) { continue; }
+      } else {
+        k.status = 'idle';
+        k.lastError = `HTTP ${r.status} — inconclusive. Try Fetch to do a live test.`;
+      }
+    } catch(e) {
+      k.status = 'idle';
+      k.lastError = `Network error: ${e.message}. Try Fetch directly.`;
     }
-    if (!verified) k.status = 'error';
+
     renderKeyPool();
+    if (k.lastError && k.status !== 'ok') {
+      errEl.textContent = `"${k.label}": ${k.lastError}`;
+      errEl.classList.remove('hidden');
+    }
   }
 }
-
-const PROXY = 'https://corsproxy.io/?';
-function getActiveProxy() { return PROXIES[activeProxyIndex]; }
 
 function getNextKey() {
   const now = Date.now();
   const usable = keyPool.filter(k => k.status !== 'error' && (k.status !== 'limited' || now > k.limitedUntil));
-  if (usable.length === 0) throw new Error('All API keys are rate-limited or invalid. Add more keys or wait and retry.');
+  if (usable.length === 0) throw new Error('All API keys are exhausted. Add more keys or wait for rate limits to clear.');
   const key = usable[keyRRIndex % usable.length];
   keyRRIndex++;
   return key;
 }
 
-async function xFetch(path, retries = 0, proxyOverride = null) {
+async function xFetch(path, retries = 0) {
   const key = getNextKey();
   key.status = 'active'; renderKeyPool();
-  const proxy = proxyOverride ?? getActiveProxy();
-  const r = await fetch(proxy + encodeURIComponent('https://api.twitter.com/2/' + path), { headers: { Authorization: 'Bearer ' + key.token } });
+  const r = await fetch(PROXY + encodeURIComponent('https://api.twitter.com/2/' + path), {
+    headers: { Authorization: 'Bearer ' + key.token.trim() }
+  });
   key.requests++;
+
   if (r.status === 429) {
     key.status = 'limited'; key.limitedUntil = Date.now() + 15 * 60 * 1000; key.errors++; renderKeyPool();
     if (retries < keyPool.filter(k => k.status !== 'error').length) return xFetch(path, retries + 1);
     throw new Error('All keys are rate-limited. Add more keys or wait 15 minutes.');
   }
   if (r.status === 401) {
-    /* 401 may mean a proxy stripped the Authorization header — try the next proxy */
-    const nextProxyIndex = PROXIES.findIndex((p, i) => i > PROXIES.indexOf(proxy) && p !== proxy);
-    if (nextProxyIndex !== -1) {
-      activeProxyIndex = nextProxyIndex;
-      key.requests--; key.status = 'idle'; renderKeyPool();
-      return xFetch(path, retries, PROXIES[nextProxyIndex]);
-    }
-    key.status = 'error'; key.errors++; renderKeyPool();
-    throw new Error('Authorization failed. Check your Bearer token.');
+    /* Don't permanently mark as error — could be a transient proxy issue */
+    key.status = 'idle'; key.errors++; renderKeyPool();
+    throw new Error('HTTP 401 from X API. If your token looks correct, the CORS proxy may be temporarily blocking requests — wait a moment and retry.');
+  }
+  if (r.status === 403) {
+    /* 403 = valid token but this endpoint needs a higher tier.
+       Do NOT mark the key as error — the token itself is fine. */
+    key.status = 'ok'; renderKeyPool();
+    const e = await r.json().catch(() => ({}));
+    throw new Error(`Your X API plan does not have access to this endpoint. ${e.detail || e.title || ''} — you may need a Basic or higher plan for some features.`);
   }
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
-    if (r.status === 403) { key.status = 'error'; key.errors++; } else { key.status = 'ok'; }
-    renderKeyPool();
+    key.status = 'ok'; key.errors++; renderKeyPool();
     throw new Error(e.detail || e.title || `HTTP ${r.status}`);
   }
   key.status = 'ok'; renderKeyPool();
