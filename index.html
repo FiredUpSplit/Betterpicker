@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>X Giveaway Picker</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg-primary: #ffffff; --bg-secondary: #f5f5f5;
+  --bg-info: #e6f1fb; --bg-success: #eaf3de; --bg-danger: #fcebeb; --bg-warning: #faeeda;
+  --text-primary: #1a1a1a; --text-secondary: #666;
+  --text-info: #185fa5; --text-success: #3b6d11; --text-danger: #a32d2d; --text-warning: #854f0b;
+  --border: rgba(0,0,0,0.12); --border-md: rgba(0,0,0,0.22);
+  --radius-md: 8px; --radius-lg: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #1e1e1e; --bg-secondary: #2a2a2a;
+    --bg-info: #0c2d4a; --bg-success: #1a3008; --bg-danger: #3a1010; --bg-warning: #3a2004;
+    --text-primary: #f0f0f0; --text-secondary: #aaa;
+    --text-info: #85b7eb; --text-success: #97c459; --text-danger: #f09595; --text-warning: #ef9f27;
+    --border: rgba(255,255,255,0.12); --border-md: rgba(255,255,255,0.22);
+  }
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-secondary); color: var(--text-primary); min-height: 100vh; padding: 2rem 1rem; }
+.app { max-width: 700px; margin: 0 auto; }
+h1 { font-size: 20px; font-weight: 500; margin-bottom: 1.5rem; }
+.step-header { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; }
+.step-badge { width: 26px; height: 26px; border-radius: 50%; background: var(--bg-info); color: var(--text-info); font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.step-title { font-size: 15px; font-weight: 500; }
+.card { background: var(--bg-primary); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+label { font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 5px; }
+input[type=text], input[type=password], input[type=number] { width: 100%; padding: 8px 10px; border: 0.5px solid var(--border-md); border-radius: var(--radius-md); font-size: 14px; background: var(--bg-primary); color: var(--text-primary); outline: none; }
+input:focus { box-shadow: 0 0 0 2px rgba(55,138,221,0.25); border-color: #378ADD; }
+select { padding: 7px 10px; border: 0.5px solid var(--border-md); border-radius: var(--radius-md); font-size: 13px; background: var(--bg-primary); color: var(--text-primary); outline: none; cursor: pointer; width: 100%; }
+.input-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tag { background: var(--bg-secondary); border: 0.5px solid var(--border); border-radius: 20px; padding: 3px 10px; font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+.tag button { background: none; border: none; cursor: pointer; font-size: 14px; color: var(--text-secondary); padding: 0; line-height: 1; }
+.toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.toggle { width: 36px; height: 20px; border-radius: 10px; background: var(--border-md); border: none; cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; }
+.toggle.on { background: #378ADD; }
+.toggle::after { content: ''; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: left 0.2s; }
+.toggle.on::after { left: 19px; }
+.toggle-label { font-size: 13px; flex: 1; }
+hr { border: none; border-top: 0.5px solid var(--border); margin: 1rem 0; }
+.btn-primary { background: var(--text-primary); color: var(--bg-primary); border: none; border-radius: var(--radius-md); padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer; width: 100%; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-sm { padding: 5px 12px; font-size: 12px; width: auto; }
+.btn-secondary { background: var(--bg-secondary); color: var(--text-primary); border: 0.5px solid var(--border-md); }
+.status-bar { background: var(--bg-secondary); border-radius: var(--radius-md); padding: 10px 14px; font-size: 13px; color: var(--text-secondary); margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: #378ADD; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Key pool */
+.key-pool { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.key-row { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 6px; padding: 7px 10px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 0.5px solid var(--border); }
+.key-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-md); flex-shrink: 0; }
+.key-dot.ok { background: #639922; }
+.key-dot.warn { background: #ef9f27; }
+.key-dot.error { background: #e24b4a; }
+.key-dot.active { background: #378ADD; box-shadow: 0 0 0 3px rgba(55,138,221,0.2); }
+.key-label-text { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.key-label-sub { font-size: 11px; color: var(--text-secondary); }
+.key-status-badge { font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+.ks-ok { background: var(--bg-success); color: var(--text-success); }
+.ks-active { background: var(--bg-info); color: var(--text-info); }
+.ks-limited { background: var(--bg-warning); color: var(--text-warning); }
+.ks-error { background: var(--bg-danger); color: var(--text-danger); }
+.ks-idle { background: var(--bg-secondary); color: var(--text-secondary); border: 0.5px solid var(--border); }
+.key-add-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.pool-summary { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+.pool-summary span { font-weight: 500; color: var(--text-primary); }
+
+/* Participants */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1rem; }
+.stat-card { background: var(--bg-secondary); border-radius: var(--radius-md); padding: 0.75rem; text-align: center; }
+.stat-num { font-size: 20px; font-weight: 500; }
+.stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.tab-row { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+.tab { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; border: 0.5px solid var(--border); background: var(--bg-secondary); color: var(--text-secondary); }
+.tab.active { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
+.participant-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+.participant-item { border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--border); }
+.participant-main { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--bg-secondary); gap: 8px; }
+.expandable { cursor: pointer; }
+.expandable:hover { filter: brightness(0.97); }
+.participant-info { flex: 1; min-width: 0; }
+.participant-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.participant-handle { color: var(--text-secondary); font-size: 11px; }
+.participant-badges { display: flex; gap: 4px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.participant-detail { display: none; padding: 8px 10px; background: var(--bg-primary); border-top: 0.5px solid var(--border); }
+.participant-detail.open { display: block; }
+.detail-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.flag-pill { background: var(--bg-warning); color: var(--text-warning); padding: 2px 8px; border-radius: 20px; font-size: 11px; }
+.flag-pill.high { background: var(--bg-danger); color: var(--text-danger); }
+.badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+.badge-ok { background: var(--bg-success); color: var(--text-success); }
+.badge-fail { background: var(--bg-danger); color: var(--text-danger); }
+.badge-warn { background: var(--bg-warning); color: var(--text-warning); }
+.badge-bot { background: #f5c4b3; color: #4a1b0c; }
+.badge-hunter { background: #cecbf6; color: #26215c; }
+.badge-dupe { background: #f4c0d1; color: #4b1528; }
+@media (prefers-color-scheme: dark) {
+  .badge-bot { background: #712b13; color: #f0997b; }
+  .badge-hunter { background: #3c3489; color: #afa9ec; }
+  .badge-dupe { background: #72243e; color: #ed93b1; }
+}
+.score-bar { height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; flex: 1; }
+.score-fill { height: 100%; border-radius: 2px; }
+
+/* Winner */
+.winner-box { text-align: center; padding: 2rem 1rem 1rem; }
+.winner-avatar { width: 64px; height: 64px; border-radius: 50%; background: var(--bg-info); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 500; color: var(--text-info); margin: 0 auto 1rem; }
+.winner-name { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+.winner-handle { font-size: 14px; color: var(--text-secondary); margin-bottom: 0.5rem; }
+.winner-rolling { font-size: 14px; color: var(--text-secondary); height: 30px; overflow: hidden; }
+@keyframes rolling { to { opacity: 0; } }
+.rolling-name { animation: rolling 0.08s steps(1) infinite; }
+
+/* Draw ID badge in winner card */
+.draw-id-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-secondary); border: 0.5px solid var(--border); border-radius: var(--radius-md); padding: 4px 10px; font-size: 11px; color: var(--text-secondary); margin-top: 8px; font-family: monospace; cursor: pointer; }
+.draw-id-badge:hover { border-color: var(--border-md); }
+.draw-id-badge .copy-hint { font-size: 10px; opacity: 0.6; }
+
+/* Audit receipt */
+.receipt-card { background: var(--bg-primary); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 1rem; overflow: hidden; }
+.receipt-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 1.25rem; border-bottom: 0.5px solid var(--border); cursor: pointer; }
+.receipt-header:hover { background: var(--bg-secondary); }
+.receipt-title { font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+.receipt-toggle { font-size: 12px; color: var(--text-secondary); }
+.receipt-body { padding: 1rem 1.25rem; display: none; }
+.receipt-body.open { display: block; }
+.receipt-section { margin-bottom: 1rem; }
+.receipt-section:last-child { margin-bottom: 0; }
+.receipt-section-title { font-size: 11px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.receipt-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 4px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; }
+.receipt-row:last-child { border-bottom: none; }
+.receipt-key { color: var(--text-secondary); flex-shrink: 0; }
+.receipt-val { font-weight: 500; text-align: right; word-break: break-all; font-family: monospace; font-size: 12px; }
+.receipt-val.normal { font-family: inherit; font-size: 13px; }
+.roll-entry { background: var(--bg-secondary); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 6px; }
+.roll-entry:last-child { margin-bottom: 0; }
+.roll-num { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+.roll-winner { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.roll-meta { font-size: 11px; color: var(--text-secondary); font-family: monospace; }
+.fingerprint-box { background: var(--bg-secondary); border-radius: var(--radius-md); padding: 8px 10px; font-family: monospace; font-size: 11px; word-break: break-all; color: var(--text-secondary); margin-top: 6px; }
+.receipt-actions { display: flex; gap: 8px; margin-top: 1rem; }
+.receipt-actions button { flex: 1; }
+
+.error-msg { background: var(--bg-danger); color: var(--text-danger); border-radius: var(--radius-md); padding: 10px 14px; font-size: 13px; margin-bottom: 1rem; }
+.info-box { background: var(--bg-info); color: var(--text-info); border-radius: var(--radius-md); padding: 10px 14px; font-size: 13px; margin-bottom: 1rem; }
+.hidden { display: none !important; }
+.note { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+a { color: var(--text-info); }
+.section-label { font-size: 13px; font-weight: 500; margin-bottom: 10px; }
+.sub-indent { margin-left: 46px; margin-bottom: 12px; }
+.cfg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+</style>
+</head>
+<body>
+<div style="text-align:center;font-size:22px;font-weight:600;color:#e24b4a;padding:1.25rem 0 1.5rem;letter-spacing:0.01em">Betterpicker by FiredUpSplit</div>
+<div class="app">
+<h1>X Giveaway Picker</h1>
+
+<!-- STEP 1: API KEYS -->
+<div class="step-header">
+  <div class="step-badge">1</div>
+  <div class="step-title">API keys</div>
+</div>
+<div class="card">
+  <div class="section-label">Bearer token pool</div>
+  <p class="note" style="margin-bottom:12px">Add one or more X API v2 Bearer tokens. Requests are round-robined across all keys with automatic rate-limit failover. Keys never leave your browser.</p>
+  <div class="key-pool" id="key-pool"></div>
+  <div class="pool-summary" id="pool-summary"></div>
+  <div class="key-add-form">
+    <input type="text" id="key-label-input" placeholder="Label (e.g. Account 1)" />
+    <input type="password" id="key-token-input" placeholder="Bearer token AAAA..." />
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn-primary btn-sm" onclick="addKey()" style="flex:1">Add key</button>
+    <button class="btn-primary btn-sm btn-secondary" onclick="verifyAllKeys()">Verify all</button>
+  </div>
+  <div class="error-msg hidden" id="key-error" style="margin-top:8px;margin-bottom:0"></div>
+</div>
+
+<!-- STEP 2: CONFIG -->
+<div class="step-header">
+  <div class="step-badge">2</div>
+  <div class="step-title">Configure giveaway</div>
+</div>
+<div class="card">
+  <label>Giveaway tweet URL</label>
+  <input type="text" id="tweet-url" placeholder="https://x.com/username/status/123456789" />
+  <hr />
+  <div class="section-label">Entry requirements</div>
+  <div class="toggle-row">
+    <button class="toggle on" id="toggle-follow" onclick="toggleReq('follow')"></button>
+    <span class="toggle-label">Must follow accounts</span>
+  </div>
+  <div id="follow-section" class="sub-indent">
+    <div class="input-row">
+      <input type="text" id="follow-input" placeholder="@username" />
+      <button class="btn-primary btn-sm" onclick="addFollow()">Add</button>
+    </div>
+    <div class="tag-row" id="follow-tags"></div>
+  </div>
+  <div class="toggle-row">
+    <button class="toggle on" id="toggle-like" onclick="toggleReq('like')"></button>
+    <span class="toggle-label">Must like a tweet</span>
+  </div>
+  <div id="like-section" class="sub-indent">
+    <input type="text" id="like-tweet-url" placeholder="Tweet URL to like (blank = giveaway tweet)" />
+  </div>
+  <div class="toggle-row">
+    <button class="toggle on" id="toggle-tag" onclick="toggleReq('tag')"></button>
+    <span class="toggle-label">Must tag friends in reply</span>
+  </div>
+  <div id="tag-section" class="sub-indent">
+    <label>Minimum tags required</label>
+    <input type="number" id="tag-count" value="1" min="1" max="10" style="width:80px" />
+  </div>
+  <div class="toggle-row">
+    <button class="toggle" id="toggle-retweet" onclick="toggleReq('retweet')"></button>
+    <span class="toggle-label">Must have retweeted</span>
+  </div>
+  <hr />
+  <div class="section-label">Fraud filters</div>
+  <div class="toggle-row">
+    <button class="toggle on" id="toggle-bot" onclick="toggleFilter('bot')"></button>
+    <span class="toggle-label">Bot detection <span style="font-weight:400;color:var(--text-secondary)">— new/empty accounts</span></span>
+  </div>
+  <div id="bot-section" class="sub-indent">
+    <div class="cfg-grid" style="margin-bottom:8px">
+      <div><label>Min account age (days)</label><input type="number" id="min-age" value="30" min="0" /></div>
+      <div><label>Min followers</label><input type="number" id="min-followers" value="10" min="0" /></div>
+      <div><label>Min tweets ever posted</label><input type="number" id="min-tweets" value="5" min="0" /></div>
+      <div><label>Max following/follower ratio</label><input type="number" id="max-ratio" value="20" min="1" /></div>
+    </div>
+    <p class="note">Also flags default profile pictures and long numeric username suffixes.</p>
+  </div>
+  <div class="toggle-row">
+    <button class="toggle on" id="toggle-hunter" onclick="toggleFilter('hunter')"></button>
+    <span class="toggle-label">Giveaway hunter detection <span style="font-weight:400;color:var(--text-secondary)">— contest-farming accounts</span></span>
+  </div>
+  <div id="hunter-section" class="sub-indent">
+    <div style="margin-bottom:8px"><label>Max following count</label><input type="number" id="max-following" value="5000" min="100" style="width:120px" /></div>
+    <p class="note">Flags accounts with giveaway keywords in bio or who mass-follow beyond the limit above.</p>
+  </div>
+  <div class="toggle-row">
+    <button class="toggle on" id="toggle-dupe" onclick="toggleFilter('dupe')"></button>
+    <span class="toggle-label">Multi-account detection <span style="font-weight:400;color:var(--text-secondary)">— duplicate profiles</span></span>
+  </div>
+  <div id="dupe-section" class="sub-indent">
+    <p class="note">Flags participants sharing the same profile picture, identical bio, or username from the same numeric cluster.</p>
+  </div>
+  <hr />
+  <div class="section-label" style="margin-bottom:8px">When fraud is detected</div>
+  <select id="filter-action" style="margin-bottom:1rem">
+    <option value="remove">Auto-disqualify (high-risk removed, medium flagged)</option>
+    <option value="flag" selected>Flag for review — flagged accounts stay eligible but are marked</option>
+    <option value="warn">Show warnings only — no impact on eligibility</option>
+  </select>
+  <button class="btn-primary" id="fetch-btn" onclick="startFetch()">Fetch participants</button>
+</div>
+
+<!-- STEP 3: PARTICIPANTS -->
+<div class="step-header hidden" id="step3-header">
+  <div class="step-badge">3</div>
+  <div class="step-title">Participants</div>
+</div>
+<div class="card hidden" id="results-section">
+  <div class="status-bar" id="status-bar"><div class="spinner"></div><span id="status-text">Fetching...</span></div>
+  <div class="error-msg hidden" id="error-msg"></div>
+  <div class="info-box hidden" id="info-box"></div>
+  <div class="stats-row hidden" id="stats-row">
+    <div class="stat-card"><div class="stat-num" id="stat-total">0</div><div class="stat-label">replies</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-eligible">0</div><div class="stat-label">eligible</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-flagged" style="color:var(--text-warning)">0</div><div class="stat-label">flagged</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-failed" style="color:var(--text-danger)">0</div><div class="stat-label">removed</div></div>
+  </div>
+  <div class="tab-row hidden" id="tab-row">
+    <button class="tab active" onclick="switchTab('all')" id="tab-all">All</button>
+    <button class="tab" onclick="switchTab('eligible')" id="tab-eligible">Eligible</button>
+    <button class="tab" onclick="switchTab('flagged')" id="tab-flagged">Flagged</button>
+    <button class="tab" onclick="switchTab('removed')" id="tab-removed">Removed</button>
+  </div>
+  <div class="participant-list hidden" id="participant-list"></div>
+  <div style="margin-top:1rem" id="pick-btn-wrap" class="hidden">
+    <button class="btn-primary" onclick="pickWinner()">Roll winner</button>
+  </div>
+</div>
+
+<!-- STEP 4: WINNER -->
+<div class="step-header hidden" id="step4-header">
+  <div class="step-badge">4</div>
+  <div class="step-title">Winner</div>
+</div>
+<div class="card hidden" id="winner-section">
+  <div class="winner-box">
+    <div class="winner-avatar" id="winner-avatar">?</div>
+    <div class="winner-rolling" id="winner-rolling"><span class="rolling-name" id="rolling-name"></span></div>
+    <div class="winner-name hidden" id="winner-name"></div>
+    <div class="winner-handle hidden" id="winner-handle"></div>
+    <a id="winner-link" href="#" target="_blank" class="hidden" style="font-size:13px;margin-top:6px;display:inline-block">View profile on X</a>
+    <div class="hidden" id="winner-draw-id-wrap">
+      <div class="draw-id-badge" onclick="copyDrawId()" title="Click to copy Draw ID">
+        <span id="winner-draw-id-text"></span>
+        <span class="copy-hint">click to copy</span>
+      </div>
+    </div>
+  </div>
+  <button class="btn-primary" onclick="pickWinner()" style="margin-bottom:8px" id="roll-again-btn">Roll again</button>
+  <button class="btn-primary btn-secondary" onclick="resetApp()">New giveaway</button>
+</div>
+
+<!-- STEP 5: AUDIT RECEIPT -->
+<div class="step-header hidden" id="step5-header">
+  <div class="step-badge">5</div>
+  <div class="step-title">Audit receipt</div>
+</div>
+<div class="receipt-card hidden" id="receipt-section">
+  <div class="receipt-header" onclick="toggleReceipt()">
+    <div class="receipt-title">
+      <span id="receipt-draw-id-label" style="font-family:monospace;font-size:13px"></span>
+      <span class="badge badge-ok" style="font-size:10px">verified</span>
+    </div>
+    <span class="receipt-toggle" id="receipt-toggle-label">Show details</span>
+  </div>
+  <div class="receipt-body" id="receipt-body">
+    <div class="receipt-section">
+      <div class="receipt-section-title">Draw information</div>
+      <div class="receipt-row"><span class="receipt-key">Draw ID</span><span class="receipt-val" id="r-draw-id"></span></div>
+      <div class="receipt-row"><span class="receipt-key">Timestamp</span><span class="receipt-val" id="r-timestamp"></span></div>
+      <div class="receipt-row"><span class="receipt-key">Tweet URL</span><span class="receipt-val" id="r-tweet-url"></span></div>
+    </div>
+    <div class="receipt-section">
+      <div class="receipt-section-title">Rules applied</div>
+      <div id="r-rules"></div>
+    </div>
+    <div class="receipt-section">
+      <div class="receipt-section-title">Participant counts</div>
+      <div class="receipt-row"><span class="receipt-key">Total replies</span><span class="receipt-val normal" id="r-total"></span></div>
+      <div class="receipt-row"><span class="receipt-key">Eligible</span><span class="receipt-val normal" id="r-eligible"></span></div>
+      <div class="receipt-row"><span class="receipt-key">Flagged</span><span class="receipt-val normal" id="r-flagged"></span></div>
+      <div class="receipt-row"><span class="receipt-key">Removed</span><span class="receipt-val normal" id="r-removed"></span></div>
+      <div class="receipt-row"><span class="receipt-key">In draw pool</span><span class="receipt-val normal" id="r-pool"></span></div>
+    </div>
+    <div class="receipt-section">
+      <div class="receipt-section-title">Eligible pool fingerprint (SHA-256)</div>
+      <p class="note" style="margin-bottom:6px">SHA-256 hash of all eligible usernames sorted alphabetically and joined with commas. Anyone can verify this independently by hashing the same list.</p>
+      <div class="fingerprint-box" id="r-fingerprint">computing...</div>
+    </div>
+    <div class="receipt-section">
+      <div class="receipt-section-title">Roll log</div>
+      <p class="note" style="margin-bottom:8px">Each roll uses a cryptographic random seed to select the winner. Given the seed and the eligible pool, any third party can reproduce the exact result.</p>
+      <div id="r-rolls"></div>
+    </div>
+    <div class="receipt-actions">
+      <button class="btn-primary btn-sm btn-secondary" onclick="copyReceipt()">Copy as JSON</button>
+      <button class="btn-primary btn-sm btn-secondary" onclick="downloadReceipt()">Download receipt</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<script>
+/* ═══════════════════════════════════════
+   KEY POOL
+═══════════════════════════════════════ */
+const keyPool = [];
+let keyRRIndex = 0, keyIdCounter = 0;
+
+const LS_KEY = 'betterpicker_keys';
+
+function saveKeys() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(keyPool.map(k => ({ id: k.id, label: k.label, token: k.token }))));
+  } catch(e) { console.warn('localStorage save failed:', e); }
+}
+
+function loadKeys() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+    saved.forEach(k => {
+      if (k.token && !keyPool.some(e => e.token === k.token)) {
+        keyIdCounter = Math.max(keyIdCounter, k.id || 0);
+        keyPool.push({ id: k.id || ++keyIdCounter, label: k.label || 'Saved key', token: k.token, status: 'idle', requests: 0, errors: 0, limitedUntil: 0 });
+      }
+    });
+  } catch(e) { console.warn('localStorage load failed:', e); }
+}
+
+function addKey() {
+  const labelEl = document.getElementById('key-label-input');
+  const tokenEl = document.getElementById('key-token-input');
+  const token = tokenEl.value.trim();
+  const label = labelEl.value.trim() || `Key ${keyPool.length + 1}`;
+  const errEl = document.getElementById('key-error');
+  errEl.classList.add('hidden');
+  if (!token) { errEl.textContent = 'Please paste a Bearer token.'; errEl.classList.remove('hidden'); return; }
+  if (keyPool.some(k => k.token === token)) { errEl.textContent = 'This token is already in the pool.'; errEl.classList.remove('hidden'); return; }
+  keyPool.push({ id: ++keyIdCounter, label, token, status: 'idle', requests: 0, errors: 0, limitedUntil: 0 });
+  labelEl.value = ''; tokenEl.value = '';
+  saveKeys();
+  renderKeyPool();
+}
+
+function removeKey(id) {
+  const idx = keyPool.findIndex(k => k.id === id);
+  if (idx !== -1) keyPool.splice(idx, 1);
+  saveKeys();
+  renderKeyPool();
+}
+
+function maskToken(t) { return t.slice(0, 8) + '••••••••' + t.slice(-4); }
+
+function renderKeyPool() {
+  const pool = document.getElementById('key-pool');
+  const summary = document.getElementById('pool-summary');
+  if (keyPool.length === 0) {
+    pool.innerHTML = `<div style="font-size:13px;color:var(--text-secondary);padding:8px 0">No keys added yet.</div>`;
+    summary.textContent = ''; return;
+  }
+  pool.innerHTML = keyPool.map(k => {
+    const dotCls = k.status === 'active' ? 'active' : k.status === 'ok' ? 'ok' : k.status === 'limited' ? 'warn' : k.status === 'error' ? 'error' : '';
+    const badgeCls = k.status === 'active' ? 'ks-active' : k.status === 'ok' ? 'ks-ok' : k.status === 'limited' ? 'ks-limited' : k.status === 'error' ? 'ks-error' : 'ks-idle';
+    const badgeTxt = k.status === 'active' ? 'in use' : k.status === 'ok' ? 'ready' : k.status === 'limited' ? 'rate limited' : k.status === 'error' ? 'invalid' : 'idle';
+    const sub = k.requests > 0 ? `${k.requests} req${k.requests > 1 ? 's' : ''}${k.errors > 0 ? ` · ${k.errors} err` : ''}` : maskToken(k.token);
+    return `<div class="key-row"><div class="key-dot ${dotCls}"></div><div><div class="key-label-text">${k.label}</div><div class="key-label-sub">${sub}</div></div><span class="key-status-badge ${badgeCls}">${badgeTxt}</span><button class="btn-primary btn-sm btn-secondary" onclick="removeKey(${k.id})" style="padding:3px 8px;font-size:11px">Remove</button></div>`;
+  }).join('');
+  const ready = keyPool.filter(k => k.status !== 'error').length;
+  const limited = keyPool.filter(k => k.status === 'limited').length;
+  summary.innerHTML = `<span>${keyPool.length}</span> key${keyPool.length > 1 ? 's' : ''} — <span>${ready}</span> usable${limited > 0 ? ` · <span style="color:var(--text-warning)">${limited} rate limited</span>` : ''}`;
+}
+
+async function verifyAllKeys() {
+  if (keyPool.length === 0) { alert('Add at least one key first.'); return; }
+  for (const k of keyPool) {
+    k.status = 'active'; renderKeyPool();
+    try {
+      const r = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://api.twitter.com/2/tweets/search/recent?query=test&max_results=10'), { headers: { Authorization: 'Bearer ' + k.token } });
+      k.status = r.status === 401 || r.status === 403 ? 'error' : r.status === 429 ? 'limited' : 'ok';
+    } catch(e) { k.status = 'error'; }
+    renderKeyPool();
+  }
+}
+
+const PROXY = 'https://corsproxy.io/?';
+
+function getNextKey() {
+  const now = Date.now();
+  const usable = keyPool.filter(k => k.status !== 'error' && (k.status !== 'limited' || now > k.limitedUntil));
+  if (usable.length === 0) throw new Error('All API keys are rate-limited or invalid. Add more keys or wait and retry.');
+  const key = usable[keyRRIndex % usable.length];
+  keyRRIndex++;
+  return key;
+}
+
+async function xFetch(path, retries = 0) {
+  const key = getNextKey();
+  key.status = 'active'; renderKeyPool();
+  const r = await fetch(PROXY + encodeURIComponent('https://api.twitter.com/2/' + path), { headers: { Authorization: 'Bearer ' + key.token } });
+  key.requests++;
+  if (r.status === 429) {
+    key.status = 'limited'; key.limitedUntil = Date.now() + 15 * 60 * 1000; key.errors++; renderKeyPool();
+    if (retries < keyPool.filter(k => k.status !== 'error').length) return xFetch(path, retries + 1);
+    throw new Error('All keys are rate-limited. Add more keys or wait 15 minutes.');
+  }
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    if (r.status === 401 || r.status === 403) { key.status = 'error'; key.errors++; } else { key.status = 'ok'; }
+    renderKeyPool();
+    throw new Error(e.detail || e.title || `HTTP ${r.status}`);
+  }
+  key.status = 'ok'; renderKeyPool();
+  return r.json();
+}
+
+/* ═══════════════════════════════════════
+   DRAW ID & CRYPTOGRAPHIC UTILITIES
+═══════════════════════════════════════ */
+
+function generateDrawId() {
+  const now = new Date();
+  const datePart = now.toISOString().slice(0,10).replace(/-/g,'');
+  const randBytes = crypto.getRandomValues(new Uint8Array(4));
+  const randPart = Array.from(randBytes).map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+  return `GVW-${datePart}-${randPart}`;
+}
+
+// Mulberry32 — deterministic PRNG from a 32-bit seed
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+async function sha256hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ═══════════════════════════════════════
+   STATE & DRAW RECORD
+═══════════════════════════════════════ */
+const state = {
+  reqs: { follow: true, like: true, tag: true, retweet: false },
+  filters: { bot: true, hunter: true, dupe: true },
+  follows: [], allResults: [], eligiblePool: [], currentTab: 'all'
+};
+
+const drawRecord = {
+  drawId: null, timestamp: null, tweetUrl: null,
+  configSnapshot: null, counts: {}, poolFingerprint: null,
+  rolls: []  // [{ rollNumber, seed, seedHex, winner, timestamp }]
+};
+
+function toggleReq(t) {
+  state.reqs[t] = !state.reqs[t];
+  document.getElementById('toggle-' + t).classList.toggle('on', state.reqs[t]);
+  const s = document.getElementById(t + '-section');
+  if (s) s.style.display = state.reqs[t] ? 'block' : 'none';
+}
+function toggleFilter(t) {
+  state.filters[t] = !state.filters[t];
+  document.getElementById('toggle-' + t).classList.toggle('on', state.filters[t]);
+  const s = document.getElementById(t + '-section');
+  if (s) s.style.display = state.filters[t] ? 'block' : 'none';
+}
+function addFollow() {
+  const inp = document.getElementById('follow-input');
+  const val = inp.value.trim().replace(/^@/, '');
+  if (!val || state.follows.includes(val)) { inp.value = ''; return; }
+  state.follows.push(val); renderTags(); inp.value = '';
+}
+document.getElementById('follow-input').addEventListener('keydown', e => { if (e.key === 'Enter') addFollow(); });
+document.getElementById('key-token-input').addEventListener('keydown', e => { if (e.key === 'Enter') addKey(); });
+function removeFollow(h) { state.follows = state.follows.filter(f => f !== h); renderTags(); }
+function renderTags() {
+  document.getElementById('follow-tags').innerHTML = state.follows.map(f =>
+    `<div class="tag">@${f}<button onclick="removeFollow('${f}')">×</button></div>`).join('');
+}
+function extractTweetId(u) { const m = (u||'').match(/status\/(\d+)/); return m ? m[1] : null; }
+function setStatus(msg) {
+  const b = document.getElementById('status-bar');
+  b.innerHTML = '<div class="spinner"></div><span>' + msg + '</span>';
+  b.classList.remove('hidden');
+}
+function hideStatus() { document.getElementById('status-bar').classList.add('hidden'); }
+function showError(msg) { const e = document.getElementById('error-msg'); e.textContent = msg; e.classList.remove('hidden'); hideStatus(); }
+function showInfo(msg) { const e = document.getElementById('info-box'); e.textContent = msg; e.classList.remove('hidden'); }
+
+/* ═══════════════════════════════════════
+   FRAUD DETECTION
+═══════════════════════════════════════ */
+function computeSuspicion(user, cfg) {
+  let score = 0; const flags = [];
+  if (!user) return { score, flags };
+  if (state.filters.bot) {
+    const ageDays = user.created_at ? (Date.now() - new Date(user.created_at)) / 86400000 : null;
+    if (ageDays !== null) {
+      if (ageDays < 7) { score += 55; flags.push({ label: 'account < 7 days old', high: true }); }
+      else if (ageDays < cfg.minAge) { score += 30; flags.push({ label: `account < ${cfg.minAge} days old`, high: ageDays < 14 }); }
+    }
+    const followers = user.public_metrics?.followers_count ?? null;
+    const following = user.public_metrics?.following_count ?? 0;
+    const tweets = user.public_metrics?.tweet_count ?? null;
+    if (followers !== null && followers < cfg.minFollowers) { score += followers < 3 ? 35 : 20; flags.push({ label: `only ${followers} follower(s)`, high: followers < 3 }); }
+    if (tweets !== null && tweets < cfg.minTweets) { score += tweets < 3 ? 25 : 12; flags.push({ label: `only ${tweets} tweet(s)`, high: tweets < 3 }); }
+    const ratio = followers > 0 ? following / followers : (following > 10 ? 999 : 0);
+    if (ratio > cfg.maxRatio) { score += 20; flags.push({ label: `follow ratio ${Math.round(ratio)}x`, high: ratio > 50 }); }
+    if (user.profile_image_url && user.profile_image_url.includes('default_profile')) { score += 25; flags.push({ label: 'default profile picture', high: true }); }
+    const numSuffix = (user.username.match(/\d+$/) || [''])[0];
+    if (numSuffix.length >= 6) { score += 20; flags.push({ label: 'long numeric username suffix', high: false }); }
+    else if (numSuffix.length >= 4) { score += 10; flags.push({ label: 'numeric username suffix', high: false }); }
+    if (!user.description) { score += 10; flags.push({ label: 'no bio', high: false }); }
+  }
+  if (state.filters.hunter) {
+    const bio = (user.description || '').toLowerCase();
+    const kw = ['giveaway','win prizes','contest winner','sweepstake','win free','winning big'].filter(k => bio.includes(k));
+    if (kw.length) { score += 30; flags.push({ label: 'giveaway keywords in bio', high: true }); }
+    const following = user.public_metrics?.following_count ?? 0;
+    if (following > cfg.maxFollowing) { score += 20; flags.push({ label: `follows ${following.toLocaleString()} accounts`, high: following > cfg.maxFollowing * 2 }); }
+  }
+  return { score, flags };
+}
+
+function applyDupeFlags(results) {
+  if (!state.filters.dupe) return;
+  const imgMap = {}, bioMap = {}, baseMap = {};
+  results.forEach(p => {
+    const u = p.user || {};
+    const imgBase = u.profile_image_url ? u.profile_image_url.replace(/_normal|_bigger|_mini|_400x400/g,'').split('?')[0] : null;
+    const bioNorm = u.description ? u.description.toLowerCase().replace(/\s+/g,' ').trim() : null;
+    const base = p.username.replace(/\d+$/,'').toLowerCase();
+    if (imgBase && !u.profile_image_url.includes('default_profile')) (imgMap[imgBase]=imgMap[imgBase]||[]).push(p);
+    if (bioNorm && bioNorm.length > 20) (bioMap[bioNorm]=bioMap[bioNorm]||[]).push(p);
+    if (base.length >= 3 && /\d/.test(p.username)) (baseMap[base]=baseMap[base]||[]).push(p);
+  });
+  const push = (group, label, sc, high) => group.forEach(p => { p.dupeFlags.push({ label, high }); p.dupeScore += sc; });
+  Object.values(imgMap).filter(g=>g.length>1).forEach(g => push(g, `same profile picture (${g.length} accounts)`, 45, true));
+  Object.values(bioMap).filter(g=>g.length>1).forEach(g => push(g, `identical bio (${g.length} accounts)`, 40, true));
+  Object.values(baseMap).filter(g=>g.length>1).forEach(g => push(g, `username cluster (@${g[0].username.replace(/\d+$/,'')}*)`, 25, false));
+}
+
+/* ═══════════════════════════════════════
+   FETCH
+═══════════════════════════════════════ */
+async function startFetch() {
+  if (keyPool.filter(k => k.status !== 'error').length === 0) { alert('Add at least one valid Bearer token before fetching.'); return; }
+  const tweetId = extractTweetId(document.getElementById('tweet-url').value.trim());
+  if (!tweetId) { alert('Please enter a valid tweet URL.'); return; }
+
+  const filterAction = document.getElementById('filter-action').value;
+  const cfg = {
+    minAge: parseInt(document.getElementById('min-age').value) || 30,
+    minFollowers: parseInt(document.getElementById('min-followers').value) || 10,
+    minTweets: parseInt(document.getElementById('min-tweets').value) || 5,
+    maxRatio: parseInt(document.getElementById('max-ratio').value) || 20,
+    maxFollowing: parseInt(document.getElementById('max-following').value) || 5000,
+  };
+
+  // Initialise draw record
+  drawRecord.drawId = generateDrawId();
+  drawRecord.timestamp = new Date().toISOString();
+  drawRecord.tweetUrl = document.getElementById('tweet-url').value.trim();
+  drawRecord.configSnapshot = {
+    requirements: { ...state.reqs, followAccounts: [...state.follows], minTagCount: parseInt(document.getElementById('tag-count').value)||1 },
+    fraudFilters: { ...state.filters, ...cfg },
+    filterAction
+  };
+  drawRecord.counts = {};
+  drawRecord.poolFingerprint = null;
+  drawRecord.rolls = [];
+
+  ['step3-header','results-section'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+  ['step4-header','winner-section','step5-header','receipt-section','error-msg','info-box','stats-row','tab-row','participant-list','pick-btn-wrap'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('fetch-btn').disabled = true;
+  keyRRIndex = 0;
+  keyPool.forEach(k => { if (k.status !== 'error') { k.status = 'idle'; k.requests = 0; k.errors = 0; } });
+  renderKeyPool();
+
+  const useLikeTweet = document.getElementById('like-tweet-url').value.trim();
+  const likeTweetId = useLikeTweet ? extractTweetId(useLikeTweet) : tweetId;
+  const tagMin = parseInt(document.getElementById('tag-count').value) || 1;
+
+  try {
+    setStatus('Fetching replies...');
+    let allReplies = [], nextToken = null, pages = 0;
+    do {
+      let path = `tweets/search/recent?query=conversation_id:${tweetId} is:reply&max_results=100&expansions=author_id&user.fields=name,username,id,created_at,public_metrics,profile_image_url,description`;
+      if (nextToken) path += '&next_token=' + nextToken;
+      const data = await xFetch(path);
+      const users = {};
+      (data.includes?.users || []).forEach(u => { users[u.id] = u; });
+      (data.data || []).forEach(t => {
+        const user = users[t.author_id];
+        if (user) allReplies.push({ tweetId: t.id, userId: t.author_id, name: user.name, username: user.username, text: t.text || '', user });
+      });
+      nextToken = data.meta?.next_token; pages++;
+      setStatus(`Fetching replies... (${allReplies.length} found)`);
+    } while (nextToken && pages < 10);
+
+    const seen = new Set();
+    const unique = allReplies.filter(r => { if (seen.has(r.userId)) return false; seen.add(r.userId); return true; });
+
+    let likers = new Set();
+    if (state.reqs.like) {
+      try {
+        setStatus('Fetching likes...');
+        let ln = null, lp = 0;
+        do {
+          let lpath = `tweets/${likeTweetId}/liking_users?max_results=100`;
+          if (ln) lpath += '&pagination_token=' + ln;
+          const ld = await xFetch(lpath);
+          (ld.data || []).forEach(u => likers.add(u.id));
+          ln = ld.meta?.next_token; lp++;
+        } while (ln && lp < 10);
+      } catch(e) { console.warn('Likes:', e.message); }
+    }
+
+    let retweeters = new Set();
+    if (state.reqs.retweet) {
+      try {
+        setStatus('Fetching retweets...');
+        let rn = null, rp = 0;
+        do {
+          let rpath = `tweets/${tweetId}/retweeted_by?max_results=100`;
+          if (rn) rpath += '&pagination_token=' + rn;
+          const rd = await xFetch(rpath);
+          (rd.data || []).forEach(u => retweeters.add(u.id));
+          rn = rd.meta?.next_token; rp++;
+        } while (rn && rp < 10);
+      } catch(e) { console.warn('Retweets:', e.message); }
+    }
+
+    const followSets = {};
+    if (state.reqs.follow && state.follows.length > 0) {
+      for (const handle of state.follows) {
+        try {
+          setStatus(`Checking followers of @${handle}...`);
+          const ud = await xFetch(`users/by/username/${handle}?user.fields=id`);
+          const fid = ud.data?.id; if (!fid) continue;
+          followSets[handle] = new Set();
+          let fn = null, fp = 0;
+          do {
+            let fpath = `users/${fid}/followers?max_results=1000&user.fields=id`;
+            if (fn) fpath += '&pagination_token=' + fn;
+            const fd = await xFetch(fpath);
+            (fd.data || []).forEach(u => followSets[handle].add(u.id));
+            fn = fd.meta?.next_token; fp++;
+          } while (fn && fp < 5);
+        } catch(e) { console.warn('Follow:', e.message); }
+      }
+    }
+
+    setStatus('Analyzing participants...');
+    const results = unique.map(p => {
+      const reqChecks = []; let reqPass = true;
+      if (state.reqs.follow && state.follows.length > 0) {
+        const nf = state.follows.filter(h => followSets[h] && !followSets[h].has(p.userId));
+        if (nf.length) { reqPass = false; reqChecks.push({ label: `not following @${nf[0]}`, pass: false }); }
+        else reqChecks.push({ label: 'follows required accounts', pass: true });
+      }
+      if (state.reqs.like) {
+        const liked = likers.size === 0 ? null : likers.has(p.userId);
+        if (liked === false) { reqPass = false; reqChecks.push({ label: 'no like', pass: false }); }
+        else reqChecks.push({ label: liked ? 'liked' : 'like unverified', pass: liked });
+      }
+      if (state.reqs.retweet) {
+        const rt = retweeters.size === 0 ? null : retweeters.has(p.userId);
+        if (rt === false) { reqPass = false; reqChecks.push({ label: 'no retweet', pass: false }); }
+        else reqChecks.push({ label: rt ? 'retweeted' : 'retweet unverified', pass: rt });
+      }
+      if (state.reqs.tag) {
+        const mentions = (p.text.match(/@\w+/g) || []).filter(m => m.toLowerCase() !== '@' + p.username.toLowerCase());
+        if (mentions.length < tagMin) { reqPass = false; reqChecks.push({ label: `only ${mentions.length} tag(s)`, pass: false }); }
+        else reqChecks.push({ label: `tagged ${mentions.length} friend(s)`, pass: true });
+      }
+      const { score, flags } = computeSuspicion(p.user, cfg);
+      return { ...p, reqPass, reqChecks, suspScore: score, suspFlags: flags, dupeFlags: [], dupeScore: 0 };
+    });
+
+    applyDupeFlags(results);
+    results.forEach(p => {
+      p.totalScore = p.suspScore + p.dupeScore;
+      p.allFlags = [...p.suspFlags, ...p.dupeFlags];
+      if (!p.reqPass) { p.status = 'removed'; p.removeReason = 'requirements'; }
+      else if (p.totalScore >= 65 && filterAction === 'remove') { p.status = 'removed'; p.removeReason = 'fraud'; }
+      else if (p.totalScore >= 40 && filterAction !== 'warn') { p.status = 'flagged'; }
+      else { p.status = 'eligible'; }
+    });
+
+    state.allResults = results;
+    const eligible = results.filter(r => r.status === 'eligible');
+    const flagged = results.filter(r => r.status === 'flagged');
+    const removed = results.filter(r => r.status === 'removed');
+
+    document.getElementById('stat-total').textContent = results.length;
+    document.getElementById('stat-eligible').textContent = eligible.length;
+    document.getElementById('stat-flagged').textContent = flagged.length;
+    document.getElementById('stat-failed').textContent = removed.length;
+    document.getElementById('stats-row').classList.remove('hidden');
+    document.getElementById('tab-row').classList.remove('hidden');
+
+    if (filterAction === 'flag' && flagged.length > 0) showInfo(`${flagged.length} account(s) flagged for fraud signals — still in the draw pool but marked for review.`);
+
+    state.currentTab = 'all';
+    renderList();
+    hideStatus();
+
+    state.eligiblePool = filterAction === 'flag' ? [...eligible, ...flagged] : eligible;
+
+    // Store counts in draw record
+    drawRecord.counts = { total: results.length, eligible: eligible.length, flagged: flagged.length, removed: removed.length, pool: state.eligiblePool.length };
+
+    // Compute eligible pool fingerprint async
+    const sortedHandles = state.eligiblePool.map(p => p.username.toLowerCase()).sort().join(',');
+    sha256hex(sortedHandles).then(fp => {
+      drawRecord.poolFingerprint = fp;
+      document.getElementById('r-fingerprint').textContent = fp;
+    });
+
+    if (state.eligiblePool.length > 0) document.getElementById('pick-btn-wrap').classList.remove('hidden');
+    else showError('No eligible participants found after applying all filters.');
+
+  } catch(e) {
+    showError('Error: ' + e.message);
+  }
+  document.getElementById('fetch-btn').disabled = false;
+  renderKeyPool();
+}
+
+/* ═══════════════════════════════════════
+   RENDER PARTICIPANTS
+═══════════════════════════════════════ */
+function switchTab(tab) {
+  state.currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  renderList();
+}
+
+function renderList() {
+  const all = state.allResults;
+  const subset = state.currentTab === 'all' ? all
+    : state.currentTab === 'eligible' ? all.filter(r => r.status === 'eligible')
+    : state.currentTab === 'flagged' ? all.filter(r => r.status === 'flagged')
+    : all.filter(r => r.status === 'removed');
+  const list = document.getElementById('participant-list');
+  const shown = subset.slice(0, 100);
+  list.innerHTML = shown.map((p, i) => {
+    const statusBadge = p.status === 'eligible' ? `<span class="badge badge-ok">eligible</span>`
+      : p.status === 'flagged' ? `<span class="badge badge-warn">flagged</span>`
+      : p.removeReason === 'fraud' ? `<span class="badge badge-fail">fraud risk</span>`
+      : `<span class="badge badge-fail">${(p.reqChecks.find(c=>!c.pass)||{}).label||'ineligible'}</span>`;
+    const fraudBadges = [];
+    if (p.suspFlags.length) fraudBadges.push(`<span class="badge badge-bot">bot risk</span>`);
+    if (p.suspFlags.some(f => f.label.includes('giveaway') || f.label.includes('accounts'))) fraudBadges.push(`<span class="badge badge-hunter">hunter</span>`);
+    if (p.dupeFlags.length) fraudBadges.push(`<span class="badge badge-dupe">duplicate</span>`);
+    const allFlags = p.allFlags || [];
+    const hasDetail = allFlags.length > 0 || p.reqChecks.length > 0;
+    const scoreColor = p.totalScore >= 65 ? '#e24b4a' : p.totalScore >= 40 ? '#ef9f27' : '#639922';
+    const detailHtml = hasDetail ? `
+      <div class="participant-detail" id="detail-${i}">
+        ${p.totalScore > 0 ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:11px;color:var(--text-secondary)">Suspicion score:</span><span style="font-size:12px;font-weight:500;color:${scoreColor}">${p.totalScore}/100</span><div class="score-bar"><div class="score-fill" style="width:${Math.min(100,p.totalScore)}%;background:${scoreColor}"></div></div></div>` : ''}
+        ${allFlags.length ? `<div class="detail-flags">${allFlags.map(f=>`<span class="flag-pill${f.high?' high':''}">${f.label}</span>`).join('')}</div>` : ''}
+        ${p.reqChecks.length ? `<div style="margin-top:6px;font-size:11px;color:var(--text-secondary)">Entry checks: ${p.reqChecks.map(c=>c.label).join(' · ')}</div>` : ''}
+        <div style="margin-top:6px"><a href="https://x.com/${p.username}" target="_blank" style="font-size:11px">View @${p.username} on X</a></div>
+      </div>` : '';
+    return `<div class="participant-item"><div class="participant-main${hasDetail?' expandable':''}" ${hasDetail?`onclick="toggleDetail(${i})"`:''}><div class="participant-info"><div class="participant-name">${p.name}</div><div class="participant-handle">@${p.username}</div></div><div class="participant-badges">${fraudBadges.join('')}${statusBadge}</div></div>${detailHtml}</div>`;
+  }).join('');
+  if (subset.length > 100) list.innerHTML += `<div class="participant-item"><div class="participant-main" style="cursor:default"><div style="font-size:13px;color:var(--text-secondary)">...and ${subset.length - 100} more</div></div></div>`;
+  list.classList.remove('hidden');
+}
+
+function toggleDetail(i) {
+  const el = document.getElementById('detail-' + i);
+  if (el) el.classList.toggle('open');
+}
+
+/* ═══════════════════════════════════════
+   WINNER & DRAW RECORD
+═══════════════════════════════════════ */
+let rollTimer = null;
+
+function pickWinner() {
+  const pool = state.eligiblePool || [];
+  if (!pool.length) return;
+  if (rollTimer) clearInterval(rollTimer);
+
+  document.getElementById('step4-header').classList.remove('hidden');
+  document.getElementById('winner-section').classList.remove('hidden');
+  ['winner-name','winner-handle','winner-link','winner-draw-id-wrap'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('winner-rolling').classList.remove('hidden');
+  document.getElementById('winner-avatar').textContent = '?';
+  document.getElementById('roll-again-btn').disabled = true;
+
+  // Generate cryptographic seed for this roll
+  const seedArr = crypto.getRandomValues(new Uint32Array(1));
+  const seed = seedArr[0];
+  const seedHex = seed.toString(16).padStart(8, '0').toUpperCase();
+  const rng = mulberry32(seed);
+  const rollTimestamp = new Date().toISOString();
+
+  // Animate using the seeded RNG (animation is cosmetic; actual winner determined by first seeded call)
+  const winnerIndex = Math.floor(rng() * pool.length);
+  const winner = pool[winnerIndex];
+
+  // Log this roll immediately so it's recorded even if user sees animation
+  const rollEntry = {
+    rollNumber: drawRecord.rolls.length + 1,
+    seed,
+    seedHex,
+    winnerUsername: winner.username,
+    winnerName: winner.name,
+    timestamp: rollTimestamp
+  };
+  drawRecord.rolls.push(rollEntry);
+
+  let frames = 0;
+  rollTimer = setInterval(() => {
+    // Cosmetic animation only — winner already determined above
+    document.getElementById('rolling-name').textContent = '@' + pool[Math.floor(Math.random() * pool.length)].username;
+    if (++frames >= 30) {
+      clearInterval(rollTimer);
+      document.getElementById('winner-rolling').classList.add('hidden');
+      document.getElementById('winner-avatar').textContent = winner.name.slice(0, 2).toUpperCase();
+      document.getElementById('winner-name').textContent = winner.name;
+      document.getElementById('winner-name').classList.remove('hidden');
+      document.getElementById('winner-handle').textContent = '@' + winner.username;
+      document.getElementById('winner-handle').classList.remove('hidden');
+      const link = document.getElementById('winner-link');
+      link.href = 'https://x.com/' + winner.username;
+      link.classList.remove('hidden');
+      // Show draw ID badge
+      document.getElementById('winner-draw-id-text').textContent = drawRecord.drawId;
+      document.getElementById('winner-draw-id-wrap').classList.remove('hidden');
+      document.getElementById('roll-again-btn').disabled = false;
+      // Render / update receipt
+      renderReceipt();
+    }
+  }, 80);
+}
+
+function copyDrawId() {
+  const id = drawRecord.drawId;
+  if (!id) return;
+  navigator.clipboard.writeText(id).then(() => {
+    const el = document.querySelector('.copy-hint');
+    if (el) { const prev = el.textContent; el.textContent = 'copied!'; setTimeout(() => { el.textContent = prev; }, 1500); }
+  });
+}
+
+/* ═══════════════════════════════════════
+   RECEIPT
+═══════════════════════════════════════ */
+function renderReceipt() {
+  const r = drawRecord;
+  document.getElementById('step5-header').classList.remove('hidden');
+  document.getElementById('receipt-section').classList.remove('hidden');
+  document.getElementById('receipt-draw-id-label').textContent = r.drawId;
+
+  document.getElementById('r-draw-id').textContent = r.drawId;
+  document.getElementById('r-timestamp').textContent = r.timestamp;
+  document.getElementById('r-tweet-url').textContent = r.tweetUrl;
+
+  // Rules
+  const cfg = r.configSnapshot;
+  const rulesEl = document.getElementById('r-rules');
+  const ruleRows = [];
+  if (cfg.requirements.follow) ruleRows.push(['Follow required', cfg.requirements.followAccounts.map(h=>'@'+h).join(', ') || 'yes']);
+  if (cfg.requirements.like) ruleRows.push(['Must like tweet', 'yes']);
+  if (cfg.requirements.tag) ruleRows.push(['Min friend tags', cfg.requirements.minTagCount]);
+  if (cfg.requirements.retweet) ruleRows.push(['Must retweet', 'yes']);
+  ruleRows.push(['Fraud filter action', cfg.filterAction]);
+  if (cfg.fraudFilters.bot) {
+    ruleRows.push(['Min account age', cfg.fraudFilters.minAge + ' days']);
+    ruleRows.push(['Min followers', cfg.fraudFilters.minFollowers]);
+    ruleRows.push(['Min tweets', cfg.fraudFilters.minTweets]);
+    ruleRows.push(['Max follow ratio', cfg.fraudFilters.maxRatio + 'x']);
+  }
+  if (cfg.fraudFilters.hunter) ruleRows.push(['Max following', cfg.fraudFilters.maxFollowing.toLocaleString()]);
+  rulesEl.innerHTML = ruleRows.map(([k,v]) => `<div class="receipt-row"><span class="receipt-key">${k}</span><span class="receipt-val normal">${v}</span></div>`).join('');
+
+  // Counts
+  document.getElementById('r-total').textContent = r.counts.total;
+  document.getElementById('r-eligible').textContent = r.counts.eligible;
+  document.getElementById('r-flagged').textContent = r.counts.flagged;
+  document.getElementById('r-removed').textContent = r.counts.removed;
+  document.getElementById('r-pool').textContent = r.counts.pool;
+
+  // Fingerprint (may still be computing)
+  if (r.poolFingerprint) document.getElementById('r-fingerprint').textContent = r.poolFingerprint;
+
+  // Roll log
+  const rollsEl = document.getElementById('r-rolls');
+  rollsEl.innerHTML = r.rolls.map(roll => `
+    <div class="roll-entry">
+      <div class="roll-num">Roll #${roll.rollNumber} — ${roll.timestamp}</div>
+      <div class="roll-winner">Winner: ${roll.winnerName} (@${roll.winnerUsername})</div>
+      <div class="roll-meta">Seed: 0x${roll.seedHex} (${roll.seed}) — reproduce: mulberry32(${roll.seed}), index = floor(rng() × ${r.counts.pool})</div>
+    </div>`).join('');
+}
+
+function toggleReceipt() {
+  const body = document.getElementById('receipt-body');
+  const label = document.getElementById('receipt-toggle-label');
+  const open = body.classList.toggle('open');
+  label.textContent = open ? 'Hide details' : 'Show details';
+}
+
+function buildReceiptJson() {
+  const r = drawRecord;
+  return JSON.stringify({
+    drawId: r.drawId,
+    timestamp: r.timestamp,
+    tweetUrl: r.tweetUrl,
+    configSnapshot: r.configSnapshot,
+    counts: r.counts,
+    eligiblePoolFingerprint_SHA256: r.poolFingerprint,
+    eligiblePool: (state.eligiblePool || []).map(p => p.username).sort(),
+    rolls: r.rolls.map(roll => ({
+      rollNumber: roll.rollNumber,
+      timestamp: roll.timestamp,
+      seedDecimal: roll.seed,
+      seedHex: '0x' + roll.seedHex,
+      algorithm: 'mulberry32',
+      indexFormula: `floor(rng() × ${r.counts.pool})`,
+      winner: { username: roll.winnerUsername, name: roll.winnerName }
+    }))
+  }, null, 2);
+}
+
+function copyReceipt() {
+  navigator.clipboard.writeText(buildReceiptJson()).then(() => {
+    const btn = event.target;
+    const prev = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = prev; }, 1500);
+  });
+}
+
+function downloadReceipt() {
+  const blob = new Blob([buildReceiptJson()], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${drawRecord.drawId || 'receipt'}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function resetApp() {
+  ['step3-header','results-section','step4-header','winner-section','step5-header','receipt-section'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  state.allResults = []; state.eligiblePool = [];
+  drawRecord.drawId = null; drawRecord.rolls = [];
+  keyPool.forEach(k => { k.status = 'idle'; k.requests = 0; k.errors = 0; });
+  renderKeyPool();
+}
+
+/* Init */
+loadKeys();
+renderKeyPool();
+</script>
+</body>
+</html>
