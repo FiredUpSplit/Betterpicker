@@ -152,7 +152,16 @@ hr { border: none; border-top: 0.5px solid var(--border); margin: 1rem 0; }
 .error-msg { background: var(--bg-danger); color: var(--text-danger); border-radius: var(--radius-md); padding: 10px 14px; font-size: 13px; margin-bottom: 1rem; }
 .info-box { background: var(--bg-info); color: var(--text-info); border-radius: var(--radius-md); padding: 10px 14px; font-size: 13px; margin-bottom: 1rem; }
 .hidden { display: none !important; }
-.note { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+.mode-btn { padding: 10px 14px; border-radius: var(--radius-md); border: 0.5px solid var(--border-md); background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer; text-align: left; transition: border-color 0.15s; }
+.mode-btn.active { border: 2px solid #378ADD; background: var(--bg-info); color: var(--text-info); }
+.mode-btn.active div { opacity: 1 !important; }
+.manual-entry-area { width: 100%; min-height: 120px; resize: vertical; padding: 8px 10px; border: 0.5px solid var(--border-md); border-radius: var(--radius-md); font-size: 13px; background: var(--bg-primary); color: var(--text-primary); outline: none; font-family: monospace; line-height: 1.6; }
+.manual-entry-area:focus { box-shadow: 0 0 0 2px rgba(55,138,221,0.25); border-color: #378ADD; }
+#drop-zone { border: 1.5px dashed var(--border-md); border-radius: var(--radius-lg); padding: 2rem 1rem; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+#drop-zone:hover, #drop-zone.drag-over { border-color: #378ADD; background: var(--bg-info); }
+#drop-zone.success { border-color: #639922; border-style: solid; background: var(--bg-success); }
+#drop-zone.parse-error { border-color: #e24b4a; border-style: solid; background: var(--bg-danger); }
+
 a { color: var(--text-info); }
 .section-label { font-size: 13px; font-weight: 500; margin-bottom: 10px; }
 .sub-indent { margin-left: 46px; margin-bottom: 12px; }
@@ -164,7 +173,23 @@ a { color: var(--text-info); }
 <div class="app">
 <h1>X Giveaway Picker</h1>
 
+<!-- MODE SWITCHER -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="section-label" style="margin-bottom:10px">Mode</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <button class="mode-btn active" id="mode-btn-api" onclick="setMode('api')">
+      <div style="font-weight:500;font-size:13px">API mode</div>
+      <div style="font-size:11px;opacity:0.7;margin-top:2px">Automatic — needs X API Basic ($100/mo)</div>
+    </button>
+    <button class="mode-btn" id="mode-btn-manual" onclick="setMode('manual')">
+      <div style="font-weight:500;font-size:13px">Manual mode</div>
+      <div style="font-size:11px;opacity:0.7;margin-top:2px">Free — paste usernames yourself</div>
+    </button>
+  </div>
+</div>
+
 <!-- STEP 1: API KEYS -->
+<div id="api-keys-section">
 <div class="step-header">
   <div class="step-badge">1</div>
   <div class="step-title">API keys</div>
@@ -184,6 +209,7 @@ a { color: var(--text-info); }
   </div>
   <div class="error-msg hidden" id="key-error" style="margin-top:8px;margin-bottom:0"></div>
 </div>
+</div><!-- /api-keys-section -->
 
 <!-- STEP 2: CONFIG -->
 <div class="step-header">
@@ -262,7 +288,43 @@ a { color: var(--text-info); }
     <option value="flag" selected>Flag for review — flagged accounts stay eligible but are marked</option>
     <option value="warn">Show warnings only — no impact on eligibility</option>
   </select>
-  <button class="btn-primary" id="fetch-btn" onclick="startFetch()">Fetch participants</button>
+
+  <!-- Manual entry (shown in manual mode only) -->
+  <div id="manual-entry-section" class="hidden">
+    <hr style="margin-bottom:1rem" />
+    <div class="section-label">Import replies from saved page</div>
+    <p class="note" style="margin-bottom:10px">
+      On the tweet page in your browser: scroll all the way down so all replies load, then press
+      <strong>Ctrl+S</strong> (or Cmd+S on Mac) and save as <em>Webpage, HTML Only</em>.
+      Then drop that file below.
+    </p>
+
+    <!-- Drop zone -->
+    <div id="drop-zone" onclick="document.getElementById('html-file-input').click()">
+      <div id="drop-zone-inner">
+        <div style="font-size:28px;margin-bottom:8px;opacity:0.4">&#8659;</div>
+        <div style="font-size:13px;font-weight:500">Drop saved HTML file here</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">or click to browse</div>
+      </div>
+      <div id="drop-zone-result" class="hidden">
+        <div id="drop-zone-icon" style="font-size:24px;margin-bottom:6px"></div>
+        <div id="drop-zone-title" style="font-size:13px;font-weight:500"></div>
+        <div id="drop-zone-sub" style="font-size:12px;color:var(--text-secondary);margin-top:3px"></div>
+      </div>
+    </div>
+    <input type="file" id="html-file-input" accept=".html,.htm" style="display:none" onchange="handleFileSelect(event)" />
+
+    <!-- Parse log -->
+    <div id="parse-log" class="hidden" style="margin-top:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:var(--radius-md);font-size:12px;color:var(--text-secondary);font-family:monospace;max-height:80px;overflow-y:auto"></div>
+
+    <hr style="margin:1rem 0" />
+    <div class="section-label" style="margin-bottom:6px">Participants <span id="manual-count-badge" style="font-weight:400;color:var(--text-secondary)"></span></div>
+    <p class="note" style="margin-bottom:8px">Review and edit the list. One username per line. The @ symbol is optional.</p>
+    <textarea class="manual-entry-area" id="manual-usernames" placeholder="Usernames will appear here after parsing, or paste manually:&#10;@username1&#10;@username2"></textarea>
+    <p class="note" style="margin-top:6px" id="manual-count-note"></p>
+  </div>
+
+  <button class="btn-primary" id="fetch-btn" onclick="handleStart()" style="margin-top:1rem">Load participants</button>
 </div>
 
 <!-- STEP 3: PARTICIPANTS -->
@@ -665,8 +727,298 @@ function applyDupeFlags(results) {
 }
 
 /* ═══════════════════════════════════════
-   FETCH
+   MODE
 ═══════════════════════════════════════ */
+let currentMode = 'api';
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-btn-api').classList.toggle('active', mode === 'api');
+  document.getElementById('mode-btn-manual').classList.toggle('active', mode === 'manual');
+  document.getElementById('api-keys-section').classList.toggle('hidden', mode === 'manual');
+  document.getElementById('manual-entry-section').classList.toggle('hidden', mode !== 'manual');
+  document.getElementById('fetch-btn').textContent = mode === 'manual' ? 'Load participants' : 'Fetch participants';
+}
+
+function handleStart() {
+  if (currentMode === 'manual') startManual();
+  else startFetch();
+}
+
+function parseManualUsernames(raw) {
+  return [...new Set(
+    raw.split(/[\n,\s]+/)
+      .map(u => u.trim().replace(/^@/, '').toLowerCase())
+      .filter(u => u.length > 0 && /^[a-z0-9_]{1,50}$/.test(u))
+  )];
+}
+
+
+/* ═══════════════════════════════════════
+   HTML FILE PARSER
+═══════════════════════════════════════ */
+
+// Wire up drag-and-drop after DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('drop-zone');
+  if (!dz) return;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) parseHTMLFile(file);
+  });
+
+  // Live count update for textarea
+  const ta = document.getElementById('manual-usernames');
+  if (ta) ta.addEventListener('input', updateManualCount);
+});
+
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (file) parseHTMLFile(file);
+  event.target.value = '';
+}
+
+function setDropZoneState(state, title, sub) {
+  const dz = document.getElementById('drop-zone');
+  const inner = document.getElementById('drop-zone-inner');
+  const result = document.getElementById('drop-zone-result');
+  const icon = document.getElementById('drop-zone-icon');
+  const titleEl = document.getElementById('drop-zone-title');
+  const subEl = document.getElementById('drop-zone-sub');
+  dz.className = state !== 'idle' ? state : '';
+  inner.classList.toggle('hidden', state !== 'idle');
+  result.classList.toggle('hidden', state === 'idle');
+  icon.textContent = state === 'success' ? '✓' : state === 'parse-error' ? '✕' : '...';
+  icon.style.color = state === 'success' ? 'var(--text-success)' : state === 'parse-error' ? 'var(--text-danger)' : 'var(--text-secondary)';
+  titleEl.textContent = title;
+  subEl.textContent = sub;
+}
+
+function log(msg) {
+  const el = document.getElementById('parse-log');
+  if (!el) return;
+  el.classList.remove('hidden');
+  el.innerHTML += msg + '<br>';
+  el.scrollTop = el.scrollHeight;
+}
+
+function parseHTMLFile(file) {
+  if (!file.name.match(/\.html?$/i)) {
+    setDropZoneState('parse-error', 'Wrong file type', 'Please upload an .html file saved from the tweet page.');
+    return;
+  }
+  setDropZoneState('loading', 'Reading file...', file.name);
+  document.getElementById('parse-log').innerHTML = '';
+  document.getElementById('parse-log').classList.add('hidden');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      extractRepliesFromHTML(e.target.result, file.name);
+    } catch(err) {
+      setDropZoneState('parse-error', 'Parse failed', err.message);
+      log('Error: ' + err.message);
+    }
+  };
+  reader.onerror = () => setDropZoneState('parse-error', 'Could not read file', 'Try re-saving the page.');
+  reader.readAsText(file, 'utf-8');
+}
+
+function extractRepliesFromHTML(html, filename) {
+  // Parse into a DOM tree (sandboxed — scripts won't run)
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  log(`Parsed: ${filename} (${Math.round(html.length / 1024)} KB)`);
+
+  const found = new Set();
+  const skipped = new Set(['home','search','notifications','messages','explore','settings','i','compose','intent','hashtag','login','signup']);
+
+  // Strategy 1 — Twitter/X's data-testid="tweet" articles (most reliable)
+  // Each reply article contains a link to the author's profile as the first /username href
+  const articles = doc.querySelectorAll('article[data-testid="tweet"], article[data-scribe], [data-testid="cellInnerDiv"] article');
+  log(`Strategy 1 (tweet articles): found ${articles.length}`);
+  articles.forEach(article => {
+    // The profile link is always the first <a href="/username"> inside the article
+    const links = article.querySelectorAll('a[href^="/"]');
+    for (const link of links) {
+      const username = extractUsername(link.getAttribute('href'), skipped);
+      if (username) { found.add(username); break; }
+    }
+  });
+
+  // Strategy 2 — User-Name test id (Twitter's display name + handle block)
+  if (found.size === 0) {
+    const nameBlocks = doc.querySelectorAll('[data-testid="User-Name"]');
+    log(`Strategy 2 (User-Name blocks): found ${nameBlocks.length}`);
+    nameBlocks.forEach(block => {
+      const links = block.querySelectorAll('a[href^="/"]');
+      for (const link of links) {
+        const username = extractUsername(link.getAttribute('href'), skipped);
+        if (username) { found.add(username); break; }
+      }
+    });
+  }
+
+  // Strategy 3 — Scan all profile-style links (fallback for older saves / Nitter)
+  if (found.size === 0) {
+    log('Strategy 3 (broad link scan)...');
+    const allLinks = doc.querySelectorAll('a[href^="/"]');
+    const counts = {};
+    allLinks.forEach(link => {
+      const u = extractUsername(link.getAttribute('href'), skipped);
+      if (u) counts[u] = (counts[u] || 0) + 1;
+    });
+    // Usernames that appear more than once are likely real participants (menu items appear once)
+    Object.entries(counts).filter(([,c]) => c > 1).forEach(([u]) => found.add(u));
+    log(`Strategy 3 found ${found.size} candidates`);
+  }
+
+  // Try to identify and exclude the original tweet author
+  let tweetAuthor = null;
+  const canonicalLink = doc.querySelector('link[rel="canonical"]');
+  if (canonicalLink) {
+    const m = canonicalLink.href.match(/x\.com\/([^/]+)\/status|twitter\.com\/([^/]+)\/status/);
+    if (m) tweetAuthor = (m[1] || m[2] || '').toLowerCase();
+  }
+  if (!tweetAuthor) {
+    // Grab the page title — usually "Name (@handle) on X"
+    const titleMatch = (doc.title || '').match(/@([a-z0-9_]+)/i);
+    if (titleMatch) tweetAuthor = titleMatch[1].toLowerCase();
+  }
+  if (tweetAuthor && found.has(tweetAuthor)) {
+    found.delete(tweetAuthor);
+    log(`Excluded tweet author: @${tweetAuthor}`);
+  }
+
+  log(`Total unique repliers found: ${found.size}`);
+
+  if (found.size === 0) {
+    setDropZoneState('parse-error', 'No replies found', 'Make sure you scroll through all replies before saving the page.');
+    return;
+  }
+
+  // Populate the textarea
+  const ta = document.getElementById('manual-usernames');
+  ta.value = [...found].join('\n');
+  updateManualCount();
+
+  setDropZoneState('success', `${found.size} replies extracted`, `from ${filename}${tweetAuthor ? ' · excluded @' + tweetAuthor : ''}`);
+}
+
+function extractUsername(href, skipped) {
+  if (!href) return null;
+  // Strip leading slash and anything after next slash (e.g. /username/status/...)
+  const raw = href.replace(/^\//, '').split('/')[0].split('?')[0].toLowerCase();
+  if (!raw) return null;
+  if (skipped.has(raw)) return null;
+  if (!/^[a-z0-9_]{1,50}$/.test(raw)) return null;
+  if (/^\d+$/.test(raw)) return null; // pure numeric = tweet ID, not username
+  return raw;
+}
+
+function updateManualCount() {
+  const ta = document.getElementById('manual-usernames');
+  const badge = document.getElementById('manual-count-badge');
+  const note = document.getElementById('manual-count-note');
+  if (!ta) return;
+  const names = parseManualUsernames(ta.value);
+  const text = names.length > 0 ? `(${names.length} unique)` : '';
+  if (badge) badge.textContent = text;
+  if (note) note.textContent = names.length > 0 ? `${names.length} unique username${names.length !== 1 ? 's' : ''} ready` : '';
+}
+
+
+  const raw = document.getElementById('manual-usernames').value;
+  const usernames = parseManualUsernames(raw);
+  if (usernames.length === 0) { alert('Paste at least one username to continue.'); return; }
+
+  const filterAction = document.getElementById('filter-action').value;
+  const cfg = {
+    minAge: parseInt(document.getElementById('min-age').value) || 30,
+    minFollowers: parseInt(document.getElementById('min-followers').value) || 10,
+    minTweets: parseInt(document.getElementById('min-tweets').value) || 5,
+    maxRatio: parseInt(document.getElementById('max-ratio').value) || 20,
+    maxFollowing: parseInt(document.getElementById('max-following').value) || 5000,
+  };
+
+  drawRecord.drawId = generateDrawId();
+  drawRecord.timestamp = new Date().toISOString();
+  drawRecord.tweetUrl = document.getElementById('tweet-url').value.trim() || '(manual entry)';
+  drawRecord.configSnapshot = {
+    mode: 'manual',
+    fraudFilters: { ...state.filters, ...cfg },
+    filterAction
+  };
+  drawRecord.counts = {};
+  drawRecord.poolFingerprint = null;
+  drawRecord.rolls = [];
+
+  ['step3-header','results-section'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+  ['step4-header','winner-section','step5-header','receipt-section','error-msg','info-box','stats-row','tab-row','participant-list','pick-btn-wrap'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('fetch-btn').disabled = true;
+  setStatus(`Processing ${usernames.length} usernames...`);
+
+  // Build lightweight participant objects — no API data available
+  const results = usernames.map(username => ({
+    userId: username,
+    name: username,
+    username,
+    text: '',
+    user: null,        // no API data in manual mode
+    reqPass: true,
+    reqChecks: [],
+    suspScore: 0,
+    suspFlags: [],
+    dupeFlags: [],
+    dupeScore: 0,
+  }));
+
+  // Only dupe detection works without API data (username cluster check)
+  applyDupeFlags(results);
+
+  results.forEach(p => {
+    p.totalScore = p.dupeScore;
+    p.allFlags = [...p.dupeFlags];
+    if (p.totalScore >= 40 && filterAction !== 'warn') { p.status = 'flagged'; }
+    else { p.status = 'eligible'; }
+  });
+
+  state.allResults = results;
+  const eligible = results.filter(r => r.status === 'eligible');
+  const flagged = results.filter(r => r.status === 'flagged');
+
+  document.getElementById('stat-total').textContent = results.length;
+  document.getElementById('stat-eligible').textContent = eligible.length;
+  document.getElementById('stat-flagged').textContent = flagged.length;
+  document.getElementById('stat-failed').textContent = 0;
+  document.getElementById('stats-row').classList.remove('hidden');
+  document.getElementById('tab-row').classList.remove('hidden');
+
+  showInfo(`Manual mode: ${results.length} participants loaded. Bot and hunter checks are skipped — only username cluster detection is active.`);
+
+  state.currentTab = 'all';
+  renderList();
+  hideStatus();
+
+  drawRecord.counts = { total: results.length, eligible: eligible.length, flagged: flagged.length, removed: 0, pool: eligible.length + (filterAction === 'flag' ? flagged.length : 0) };
+
+  const sortedHandles = results.map(p => p.username).sort().join(',');
+  sha256hex(sortedHandles).then(fp => {
+    drawRecord.poolFingerprint = fp;
+    document.getElementById('r-fingerprint').textContent = fp;
+  });
+
+  state.eligiblePool = filterAction === 'flag' ? [...eligible, ...flagged] : eligible;
+  if (state.eligiblePool.length > 0) document.getElementById('pick-btn-wrap').classList.remove('hidden');
+  else showError('No participants after filtering.');
+
+  document.getElementById('fetch-btn').disabled = false;
+}
+
+
 async function startFetch() {
   if (keyPool.filter(k => k.status !== 'error').length === 0) { alert('Add at least one valid Bearer token before fetching.'); return; }
   const tweetId = extractTweetId(document.getElementById('tweet-url').value.trim());
