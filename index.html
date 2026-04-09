@@ -436,19 +436,55 @@ function renderKeyPool() {
   summary.innerHTML = `<span>${keyPool.length}</span> key${keyPool.length > 1 ? 's' : ''} — <span>${ready}</span> usable${limited > 0 ? ` · <span style="color:var(--text-warning)">${limited} rate limited</span>` : ''}`;
 }
 
+/* Ordered list of CORS proxies to try. If one strips the Authorization header
+   (causing a spurious 401) we fall through to the next automatically.        */
+const PROXIES = [
+  'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url=',
+  'https://thingproxy.freeboard.io/fetch/',
+];
+let activeProxyIndex = 0;
+
+function getProxy() { return PROXIES[activeProxyIndex]; }
+
+/* Lightweight endpoint that works on ALL X API tiers (including free).
+   Fetches the public @XDevelopers user — no search permission needed.  */
+const VERIFY_PATH = 'users/by/username/XDevelopers?user.fields=id';
+
 async function verifyAllKeys() {
   if (keyPool.length === 0) { alert('Add at least one key first.'); return; }
   for (const k of keyPool) {
     k.status = 'active'; renderKeyPool();
-    try {
-      const r = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://api.twitter.com/2/tweets/search/recent?query=test&max_results=10'), { headers: { Authorization: 'Bearer ' + k.token } });
-      k.status = r.status === 401 || r.status === 403 ? 'error' : r.status === 429 ? 'limited' : 'ok';
-    } catch(e) { k.status = 'error'; }
+    let verified = false;
+    for (let pi = 0; pi < PROXIES.length; pi++) {
+      try {
+        const proxy = PROXIES[pi];
+        const r = await fetch(proxy + encodeURIComponent('https://api.twitter.com/2/' + VERIFY_PATH), {
+          headers: { Authorization: 'Bearer ' + k.token }
+        });
+        if (r.status === 200) {
+          k.status = 'ok';
+          if (pi !== activeProxyIndex) { activeProxyIndex = pi; }  // switch global proxy to the working one
+          verified = true; break;
+        } else if (r.status === 429) {
+          k.status = 'limited'; k.limitedUntil = Date.now() + 15 * 60 * 1000;
+          verified = true; break;
+        } else if (r.status === 401) {
+          /* Could be a stripped header — try next proxy before giving up */
+          continue;
+        } else if (r.status === 403) {
+          /* Definitive auth rejection from Twitter itself */
+          k.status = 'error'; verified = true; break;
+        }
+      } catch(e) { continue; }
+    }
+    if (!verified) k.status = 'error';
     renderKeyPool();
   }
 }
 
 const PROXY = 'https://corsproxy.io/?';
+function getActiveProxy() { return PROXIES[activeProxyIndex]; }
 
 function getNextKey() {
   const now = Date.now();
@@ -459,19 +495,31 @@ function getNextKey() {
   return key;
 }
 
-async function xFetch(path, retries = 0) {
+async function xFetch(path, retries = 0, proxyOverride = null) {
   const key = getNextKey();
   key.status = 'active'; renderKeyPool();
-  const r = await fetch(PROXY + encodeURIComponent('https://api.twitter.com/2/' + path), { headers: { Authorization: 'Bearer ' + key.token } });
+  const proxy = proxyOverride ?? getActiveProxy();
+  const r = await fetch(proxy + encodeURIComponent('https://api.twitter.com/2/' + path), { headers: { Authorization: 'Bearer ' + key.token } });
   key.requests++;
   if (r.status === 429) {
     key.status = 'limited'; key.limitedUntil = Date.now() + 15 * 60 * 1000; key.errors++; renderKeyPool();
     if (retries < keyPool.filter(k => k.status !== 'error').length) return xFetch(path, retries + 1);
     throw new Error('All keys are rate-limited. Add more keys or wait 15 minutes.');
   }
+  if (r.status === 401) {
+    /* 401 may mean a proxy stripped the Authorization header — try the next proxy */
+    const nextProxyIndex = PROXIES.findIndex((p, i) => i > PROXIES.indexOf(proxy) && p !== proxy);
+    if (nextProxyIndex !== -1) {
+      activeProxyIndex = nextProxyIndex;
+      key.requests--; key.status = 'idle'; renderKeyPool();
+      return xFetch(path, retries, PROXIES[nextProxyIndex]);
+    }
+    key.status = 'error'; key.errors++; renderKeyPool();
+    throw new Error('Authorization failed. Check your Bearer token.');
+  }
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
-    if (r.status === 401 || r.status === 403) { key.status = 'error'; key.errors++; } else { key.status = 'ok'; }
+    if (r.status === 403) { key.status = 'error'; key.errors++; } else { key.status = 'ok'; }
     renderKeyPool();
     throw new Error(e.detail || e.title || `HTTP ${r.status}`);
   }
